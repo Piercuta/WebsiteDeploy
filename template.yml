@@ -24,11 +24,15 @@ Parameters:
   Repo:
     Type: String
     Description: Name of the repo CodeCommit BAM (must be in the aws account target)
-    Default: https://git-codecommit.eu-west-1.amazonaws.com/v1/repos/BAM-PROD-ENGINE
+    Default: WebsiteDeploy
   Branch:
     Type: String
     Default: master
     Description: Name of the branch for the Repo BAM
+  ApplicationName:
+    Type: String
+    Description: Name of the repo CodeCommit BAM (must be in the aws account target)
+    Default: WSPC
 
 Resources:
   LambdaEmailRole:
@@ -120,3 +124,169 @@ Resources:
             Method: POST
             Path: /sendemail
             RestApiId: !Ref ApiGateway
+  
+  CodeBuildRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName:  !Sub ${Client}-${Env}-${ApplicationName}-code-build-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+      Path: /
+      Tags: 
+        - Key: env
+          Value: !Ref Env
+
+  CodeBuild:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: !Sub ${Client}-${Env}-${ApplicationName}-code-build-project
+      Description: A description about my project
+      LogsConfig:
+        CloudWatchLogs: 
+          Status: DISABLED 
+      ServiceRole: !GetAtt 
+        - CodeBuildRole
+        - Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: 'aws/codebuild/amazonlinux2-x86_64-standard:3.0'
+        EnvironmentVariables:
+          - Name: ApplicationName
+            Type: PLAINTEXT
+            Value: !Ref ApplicationName
+          - Name: CS
+            Type: PLAINTEXT
+            Value: !Join 
+              - ''
+              - - server=
+                - !GetAtt 
+                  - RDSInstance
+                  - Endpoint.Address
+                - ;user id=
+                - !Ref DbUser
+                - ;password=
+                - !Ref DbPassword
+                - ;database=ChoixResto
+      Source:
+        Type: CODEPIPELINE
+      Tags: 
+        - Key: env
+          Value: !Ref Env
+  
+  
+  
+  Secret:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: 'Token for accessing github repo'
+      Name:
+        !Sub
+          - 'github_token_${client}_${environment}_${application_name}'
+          - { client: !Ref Client , environment: !Ref Env, application_name: !Ref ApplicationName }
+      SecretString: 
+        !Sub
+          - '{"github_access_token_${client}_${environment}_${application_name}": "${token}"}'
+          - { client: !Ref Client, environment: !Ref Env, application_name: !Ref ApplicationName, token: !Ref Token } 
+      Tags: 
+        - Key: env
+          Value: !Ref Env
+  
+  CodePipelineRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName:  !Sub ${Client}-${Env}-${ApplicationName}-code-pipeline-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+      Path: /
+      Tags: 
+        - Key: env
+          Value: !Ref Env
+  
+  CodePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    DependsOn: Secret
+    Properties:
+      # Name: !Sub ${Client}-${Env}-${ApplicationName}-code-pipeline
+      ArtifactStore:
+        Location: !Ref ArtifactBucket
+        Type: S3
+      RoleArn: !GetAtt 
+        - CodePipelineRole
+        - Arn
+      RestartExecutionOnUpdate: true
+      Stages:
+        - Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                Owner: Piercuta
+                Repo: !Ref Repo
+                Branch: !Ref Branch
+                OAuthToken: 
+                    !Sub
+                      - '{{resolve:secretsmanager:github_token_${client}_${environment}_${application_name}:SecretString:github_access_token_${client}_${environment}_${application_name}}}'
+                      # - '{{resolve:secretsmanager:github_token_test_choixresto:SecretString:github_access_token_test_choixresto}}'
+                      - { client: !Ref Client, environment: !Ref Env, application_name: !Ref ApplicationName }
+                PollForSourceChanges: false
+              RunOrder: 1
+          Name: SOURCE
+        # - Name: Build
+          # Actions:
+            # - Name: BuildAction
+              # ActionTypeId:
+                # Category: Build
+                # Owner: AWS
+                # Version: '1'
+                # Provider: CodeBuild
+              # InputArtifacts:
+                # - Name: SourceArtifact
+              # OutputArtifacts:
+                # - Name: BuildArtifact
+              # Configuration:
+                # ProjectName: !Ref CodeBuild
+              # RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: DeployAction
+              InputArtifacts:
+                - Name: SourceArtifact
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CodeDeploy
+              Configuration:
+                BucketName: !Ref BucketWebsite,
+                Extract: true,
+                ObjectKey: MyWebsite
+              RunOrder: 1
+      Tags: 
+        - Key: env
+          Value: !Ref Env
