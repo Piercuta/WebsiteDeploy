@@ -24,7 +24,7 @@ Parameters:
   Repo:
     Type: String
     Description: Name of the repo CodeCommit BAM (must be in the aws account target)
-    Default: WebsiteDeploy
+    Default: PierreCourteilleWebsite
   Token:
     Type: String
     Description: Name of the branch for the Repo BAM
@@ -51,27 +51,6 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AWSLambdaExecute
         - arn:aws:iam::aws:policy/AmazonSESFullAccess
-      # Policies:
-        # -
-          # PolicyName:
-            # Fn::Join:
-              # - "-"
-              # -
-                # - !Ref Cust
-                # - !Ref Env
-                # - "EMAIL"
-                # - "S3"
-                # - "POLICY"
-          # PolicyDocument:
-            # Version: "2012-10-17"
-            # Statement:
-              # -
-                # Effect: "Allow"
-                # Action:
-                  # - "s3:Get*"
-                  # - "s3:List*"
-                  # - "apigateway:GET"
-                # Resource: "*"
       RoleName:
         Fn::Join:
           - "-"
@@ -94,15 +73,16 @@ Resources:
             - "EMAIL"
             - "APIGW"
       Cors:
-        AllowHeaders: "'*'"
-        AllowMethods: "'*'"
+        AllowMethods: "'POST, OPTION'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
         AllowOrigin: "'*'"
       StageName: !Ref Env
+      EndpointConfiguration:
+        Type: REGIONAL 
   BucketWebsite:
     Type: "AWS::S3::Bucket"
     DeletionPolicy: Delete
     Properties:
-      BucketName: toto-piercuta.com
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: index.html
@@ -111,6 +91,21 @@ Resources:
         # BlockPublicPolicy: false
         # IgnorePublicAcls: false
         # RestrictPublicBuckets: false
+        
+        
+  ArtifactBucket:
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: Delete
+    Properties:
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      # PublicAccessBlockConfiguration:
+        # BlockPublicAcls: false
+        # BlockPublicPolicy: false
+        # IgnorePublicAcls: false
+        # RestrictPublicBuckets: false
+
   LambdaEmail:
     # SAM resource to create a Lambda function
     Type: "AWS::Serverless::Function"
@@ -131,7 +126,7 @@ Resources:
   CodeBuildRole:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName:  !Sub ${Client}-${Env}-${ApplicationName}-code-build-role
+      RoleName:  !Sub ${Cust}-${Env}-${ApplicationName}-code-build-role
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -151,7 +146,7 @@ Resources:
   CodeBuild:
     Type: 'AWS::CodeBuild::Project'
     Properties:
-      Name: !Sub ${Client}-${Env}-${ApplicationName}-code-build-project
+      Name: !Sub ${Cust}-${Env}-${ApplicationName}-code-build-project
       Description: A description about my project
       LogsConfig:
         CloudWatchLogs: 
@@ -166,22 +161,9 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: 'aws/codebuild/amazonlinux2-x86_64-standard:3.0'
         EnvironmentVariables:
-          - Name: ApplicationName
+          - Name: httpEmail
+            Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Env}/sendemail"
             Type: PLAINTEXT
-            Value: !Ref ApplicationName
-          - Name: CS
-            Type: PLAINTEXT
-            Value: !Join 
-              - ''
-              - - server=
-                - !GetAtt 
-                  - RDSInstance
-                  - Endpoint.Address
-                - ;user id=
-                - !Ref DbUser
-                - ;password=
-                - !Ref DbPassword
-                - ;database=ChoixResto
       Source:
         Type: CODEPIPELINE
       Tags: 
@@ -197,11 +179,11 @@ Resources:
       Name:
         !Sub
           - 'github_token_${client}_${environment}_${application_name}'
-          - { client: !Ref Client , environment: !Ref Env, application_name: !Ref ApplicationName }
+          - { client: !Ref Cust , environment: !Ref Env, application_name: !Ref ApplicationName }
       SecretString: 
         !Sub
           - '{"github_access_token_${client}_${environment}_${application_name}": "${token}"}'
-          - { client: !Ref Client, environment: !Ref Env, application_name: !Ref ApplicationName, token: !Ref Token } 
+          - { client: !Ref Cust, environment: !Ref Env, application_name: !Ref ApplicationName, token: !Ref Token } 
       Tags: 
         - Key: env
           Value: !Ref Env
@@ -209,7 +191,7 @@ Resources:
   CodePipelineRole:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName:  !Sub ${Client}-${Env}-${ApplicationName}-code-pipeline-role
+      RoleName:  !Sub ${Cust}-${Env}-${ApplicationName}-code-pipeline-role
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -256,39 +238,38 @@ Resources:
                     !Sub
                       - '{{resolve:secretsmanager:github_token_${client}_${environment}_${application_name}:SecretString:github_access_token_${client}_${environment}_${application_name}}}'
                       # - '{{resolve:secretsmanager:github_token_test_choixresto:SecretString:github_access_token_test_choixresto}}'
-                      - { client: !Ref Client, environment: !Ref Env, application_name: !Ref ApplicationName }
+                      - { client: !Ref Cust, environment: !Ref Env, application_name: !Ref ApplicationName }
                 PollForSourceChanges: false
               RunOrder: 1
           Name: SOURCE
-        # - Name: Build
-          # Actions:
-            # - Name: BuildAction
-              # ActionTypeId:
-                # Category: Build
-                # Owner: AWS
-                # Version: '1'
-                # Provider: CodeBuild
-              # InputArtifacts:
-                # - Name: SourceArtifact
-              # OutputArtifacts:
-                # - Name: BuildArtifact
-              # Configuration:
-                # ProjectName: !Ref CodeBuild
-              # RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: '1'
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !Ref CodeBuild
+              RunOrder: 1
         - Name: Deploy
           Actions:
             - Name: DeployAction
               InputArtifacts:
-                - Name: SourceArtifact
+                - Name: BuildArtifact
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
                 Version: '1'
-                Provider: CodeDeploy
+                Provider: S3
               Configuration:
-                BucketName: !Ref BucketWebsite,
-                Extract: true,
-                ObjectKey: MyWebsite
+                BucketName: !Ref BucketWebsite
+                Extract: true
               RunOrder: 1
       Tags: 
         - Key: env

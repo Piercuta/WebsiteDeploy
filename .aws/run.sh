@@ -19,7 +19,7 @@ BRANCH="master"
 ENV="PROD"
 CUST="PC"
 
-while getopts "vp:r:e:b:c:t" option
+while getopts "vp:r:e:b:c:t:" option
 do
     case "${option}"
         in
