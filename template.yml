@@ -21,14 +21,14 @@ Parameters:
   CustLC:
     Type: String
     Description: Name of the customer Lowercase
-  # Repo:
-    # Type: String
-    # Description: Name of the repo CodeCommit BAM (must be in the aws account target)
-    # Default: https://git-codecommit.eu-west-1.amazonaws.com/v1/repos/BAM-PROD-ENGINE
-  # Branch:
-    # Type: String
-    # Default: master
-    # Description: Name of the branch for the Repo BAM
+  Repo:
+    Type: String
+    Description: Name of the repo CodeCommit BAM (must be in the aws account target)
+    Default: https://git-codecommit.eu-west-1.amazonaws.com/v1/repos/BAM-PROD-ENGINE
+  Branch:
+    Type: String
+    Default: master
+    Description: Name of the branch for the Repo BAM
 
 Resources:
   LambdaEmailRole:

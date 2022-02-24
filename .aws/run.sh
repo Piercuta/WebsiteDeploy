@@ -69,11 +69,12 @@ LOG_AND_EXEC "aws ${AWS_DEBUG} cloudformation package \
 
 echo "Deploy cloudformation ${STACK_NAME}"
 LOG_AND_EXEC "aws ${AWS_DEBUG} cloudformation deploy \
-    --template-file new-${PACKAGED_TEMPLATE} \
+    --template-file ${PACKAGED_TEMPLATE} \
     --stack-name ${STACK_NAME} \
     --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
     --parameter-overrides \
         Cust=${CUST} \
         Env=${ENV} \
         EnvLC=${ENV,,} \
-        CustLC=${CUST,,}
+        CustLC=${CUST,,} \
+        Branch=${BRANCH}"
