@@ -1,0 +1,122 @@
+Transform: "AWS::Serverless-2016-10-31"
+Description: "
+  Create environment to trigger BAM
+  - an lambda trigger on buckets
+  - an lambda trigger on api gateway with apikey
+  "
+Globals:
+  Function:
+    Timeout: 15
+
+Parameters:
+  Cust:
+    Type: String
+    Description: Name of the customer Uppercase
+  Env:
+    Type: String
+    Description: Env to deploy Uppercase
+  EnvLC:
+    Type: String
+    Description: Env to deploy Lowercase
+  CustLC:
+    Type: String
+    Description: Name of the customer Lowercase
+  # Repo:
+    # Type: String
+    # Description: Name of the repo CodeCommit BAM (must be in the aws account target)
+    # Default: https://git-codecommit.eu-west-1.amazonaws.com/v1/repos/BAM-PROD-ENGINE
+  # Branch:
+    # Type: String
+    # Default: master
+    # Description: Name of the branch for the Repo BAM
+
+Resources:
+  LambdaEmailRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            Effect: "Allow"
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+        - arn:aws:iam::aws:policy/AmazonSESFullAccess
+      # Policies:
+        # -
+          # PolicyName:
+            # Fn::Join:
+              # - "-"
+              # -
+                # - !Ref Cust
+                # - !Ref Env
+                # - "EMAIL"
+                # - "S3"
+                # - "POLICY"
+          # PolicyDocument:
+            # Version: "2012-10-17"
+            # Statement:
+              # -
+                # Effect: "Allow"
+                # Action:
+                  # - "s3:Get*"
+                  # - "s3:List*"
+                  # - "apigateway:GET"
+                # Resource: "*"
+      RoleName:
+        Fn::Join:
+          - "-"
+          -
+            - !Ref Cust
+            - !Ref Env
+            - "LAMBDA"
+            - "EMAIL"
+            - "ROLE"
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name:
+        Fn::Join:
+          - "-"
+          -
+            - !Ref Cust
+            - !Ref Env
+            - "SEND"
+            - "EMAIL"
+            - "APIGW"
+      Cors:
+        AllowHeaders: "'*'"
+        AllowMethods: "'*'"
+        AllowOrigin: "'*'"
+      StageName: !Ref Env
+  BucketWebsite:
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: toto-piercuta.com
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      # PublicAccessBlockConfiguration:
+        # BlockPublicAcls: false
+        # BlockPublicPolicy: false
+        # IgnorePublicAcls: false
+        # RestrictPublicBuckets: false
+  LambdaEmail:
+    # SAM resource to create a Lambda function
+    Type: "AWS::Serverless::Function"
+    Properties:
+      Runtime: nodejs14.x
+      CodeUri: send_email
+      Handler: index.handler
+      Timeout: 4
+      Role: !GetAtt LambdaEmailRole.Arn
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Method: POST
+            Path: /sendemail
+            RestApiId: !Ref ApiGateway

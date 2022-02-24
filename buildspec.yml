@@ -1,0 +1,12 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      python: 3.7
+    run-as: root
+    commands:
+      - apt-get update -y
+      - chmod +x .aws/run.sh
+  build:
+    commands:
+      - .aws/run.sh
