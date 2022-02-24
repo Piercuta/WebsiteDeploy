@@ -48,16 +48,16 @@ Resources:
       PathPart: send_email
       RestApiId: !Ref ApiGateway
   
-  EmptyModel:
-    Type: AWS::ApiGateway::Model
-    Properties: 
-      ContentType: application/json
-      Name: EmptyModel
-      RestApiId: !Ref ApiGateway
-      Schema: 
-        "$schema": http://json-schema.org/draft-04/schema#
-        title: Empty Schema
-        type: object
+  # EmptyModel:
+  #   Type: AWS::ApiGateway::Model
+  #   Properties: 
+  #     ContentType: application/json
+  #     Name: EmptyModel
+  #     RestApiId: !Ref ApiGateway
+  #     Schema: 
+  #       "$schema": http://json-schema.org/draft-04/schema#
+  #       title: Empty Schema
+  #       type: object
 
   ApiGatewayMethodOPTIONS:
     Type: 'AWS::ApiGateway::Method'
@@ -68,10 +68,17 @@ Resources:
       AuthorizationType: NONE
       Integration:
         Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
         IntegrationHttpMethod: OPTIONS
         IntegrationResponses: 
           - StatusCode: 200
-
+            ResponseParameters: 
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'" 
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'" 
+              method.response.header.Access-Control-Allow-Origin: "'*'" 
+            ResponseTemplates:
+              application/json: ''
         Uri: !Sub >-
           arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaEmail.Arn}/invocations
       # RequestModels: 
@@ -79,8 +86,12 @@ Resources:
       MethodResponses:
         - StatusCode: 200
           ResponseModels:
-            application/json: EmptyModel
-
+            application/json: Empty
+          ResponseParameters: 
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+  
   ApiGatewayMethodPOST:
     Type: 'AWS::ApiGateway::Method'
     Properties:
@@ -93,17 +104,18 @@ Resources:
         IntegrationHttpMethod: POST
         IntegrationResponses: 
           - StatusCode: 200
-
+            ResponseParameters: 
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
         Uri: !Sub >-
           arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaEmail.Arn}/invocations
-      # RequestModels: 
-      #   application/json: Empty
       MethodResponses:
         - StatusCode: 200
           ResponseModels:
-            application/json: EmptyModel
-
-    
+            application/json: Empty
+          ResponseParameters: 
+              method.response.header.Access-Control-Allow-Origin: true
   
   ApiGtwStage:
     Type: AWS::ApiGateway::Stage
@@ -134,11 +146,6 @@ Resources:
             - "SEND"
             - "EMAIL"
             - "APIGW"
-      # Cors:
-      #   AllowMethods: "'POST, OPTIONS'"
-      #   AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-      #   AllowOrigin: "'*'"
-      # StageName: !GetAtt ApiGtwStage.Stage
       EndpointConfiguration:
         Types: 
           - REGIONAL 
@@ -217,7 +224,6 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/POST/send_email
 
-
   LambdaEmail:
     # SAM resource to create a Lambda function
     Type: "AWS::Serverless::Function"
@@ -227,13 +233,6 @@ Resources:
       Handler: index.handler
       Timeout: 4
       Role: !GetAtt LambdaEmailRole.Arn
-      # Events:
-      #   ApiEvent:
-      #     Type: Api
-      #     Properties:
-      #       Method: POST
-      #       Path: /send_email_unused
-      #       RestApiId: !Ref ApiGateway
   
   CodeBuildRole:
     Type: 'AWS::IAM::Role'
@@ -281,8 +280,6 @@ Resources:
       Tags: 
         - Key: env
           Value: !Ref Env
-  
-  
   
   Secret:
     Type: AWS::SecretsManager::Secret
@@ -349,7 +346,6 @@ Resources:
                 OAuthToken: 
                     !Sub
                       - '{{resolve:secretsmanager:github_token_${client}_${environment}_${application_name}:SecretString:github_access_token_${client}_${environment}_${application_name}}}'
-                      # - '{{resolve:secretsmanager:github_token_test_choixresto:SecretString:github_access_token_test_choixresto}}'
                       - { client: !Ref Cust, environment: !Ref Env, application_name: !Ref ApplicationName }
                 PollForSourceChanges: false
               RunOrder: 1
