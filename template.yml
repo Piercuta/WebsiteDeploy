@@ -25,6 +25,9 @@ Parameters:
     Type: String
     Description: Name of the repo CodeCommit BAM (must be in the aws account target)
     Default: WebsiteDeploy
+  Token:
+    Type: String
+    Description: Name of the branch for the Repo BAM
   Branch:
     Type: String
     Default: master

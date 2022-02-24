@@ -9,4 +9,4 @@ phases:
       - chmod +x .aws/run.sh
   build:
     commands:
-      - .aws/run.sh
+      - .aws/run.sh -t $Token

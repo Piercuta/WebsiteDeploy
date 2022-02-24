@@ -19,7 +19,7 @@ BRANCH="master"
 ENV="PROD"
 CUST="PC"
 
-while getopts "vp:r:e:b:c" option
+while getopts "vp:r:e:b:c:t" option
 do
     case "${option}"
         in
@@ -29,8 +29,15 @@ do
         e) ENV=${OPTARG^^};;
         b) BRANCH=${OPTARG};;
         c) CUST="PC";;
+		t) TOKEN=${OPTARG};;
     esac
 done
+
+echo $REGION
+echo $ENV
+echo $BRANCH
+echo $TOKEN
+
 AWS_DEBUG="--region ${REGION} ${PROFILE}"
 TEMPLATE="template.yml"
 PACKAGED_TEMPLATE="packaged-${TEMPLATE}"
@@ -77,4 +84,5 @@ LOG_AND_EXEC "aws ${AWS_DEBUG} cloudformation deploy \
         Env=${ENV} \
         EnvLC=${ENV,,} \
         CustLC=${CUST,,} \
+		Token=${TOKEN} \
         Branch=${BRANCH}"
