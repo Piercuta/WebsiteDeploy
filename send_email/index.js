@@ -26,7 +26,7 @@ exports.handler = async (event) => {
           Data: event.subject
          }
         },
-      Source: 'pcourteille@premaccess.com', /* required */
+      Source: 'support@pierre-courteille.com', /* required */
       
     };
     
