@@ -171,6 +171,7 @@ Resources:
     Type: "AWS::S3::Bucket"
     DeletionPolicy: Delete
     Properties:
+      BucketName: piercuta.com
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: index.html
