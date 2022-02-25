@@ -1,6 +1,6 @@
 Transform: "AWS::Serverless-2016-10-31"
 Description: "
-  Create environment to trigger BAM
+  Create Environment to trigger BAM
   - an lambda trigger on buckets
   - an lambda trigger on api gateway with apikey
   "
@@ -11,16 +11,16 @@ Globals:
 Parameters:
   Cust:
     Type: String
-    Description: Name of the customer Uppercase
+    Description: Name of the CustLComer Uppercase
   Env:
     Type: String
-    Description: Env to deploy Uppercase
+    Description: EnvLC to deploy Uppercase
   EnvLC:
     Type: String
-    Description: Env to deploy Lowercase
+    Description: EnvLC to deploy Lowercase
   CustLC:
     Type: String
-    Description: Name of the customer Lowercase
+    Description: Name of the CustLComer Lowercase
   Repo:
     Type: String
     Description: Name of the repo CodeCommit BAM (must be in the aws account target)
@@ -35,7 +35,7 @@ Parameters:
   ApplicationName:
     Type: String
     Description: Name of the repo CodeCommit BAM (must be in the aws account target)
-    Default: WSPC
+    Default: wspc
 
 Resources:
 
@@ -141,11 +141,11 @@ Resources:
         Fn::Join:
           - "-"
           -
-            - !Ref Cust
-            - !Ref Env
-            - "SEND"
-            - "EMAIL"
-            - "APIGW"
+            - !Ref CustLC
+            - !Ref EnvLC
+            - "send"
+            - "email"
+            - "apigw"
       EndpointConfiguration:
         Types: 
           - REGIONAL 
@@ -211,11 +211,11 @@ Resources:
         Fn::Join:
           - "-"
           -
-            - !Ref Cust
-            - !Ref Env
-            - "LAMBDA"
-            - "EMAIL"
-            - "ROLE"
+            - !Ref CustLC
+            - !Ref EnvLC
+            - "lambda"
+            - "email"
+            - "role"
 
   LambdaPermissionEmail:
     Type: AWS::Lambda::Permission
@@ -238,7 +238,7 @@ Resources:
   CodeBuildRole:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName:  !Sub ${Cust}-${Env}-${ApplicationName}-code-build-role
+      RoleName:  !Sub ${CustLC}-${EnvLC}-${ApplicationName}-code-build-role
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -252,13 +252,13 @@ Resources:
         - 'arn:aws:iam::aws:policy/AdministratorAccess'
       Path: /
       Tags: 
-        - Key: env
+        - Key: Env
           Value: !Ref Env
 
   CodeBuild:
     Type: 'AWS::CodeBuild::Project'
     Properties:
-      Name: !Sub ${Cust}-${Env}-${ApplicationName}-code-build-project
+      Name: !Sub ${CustLC}-${EnvLC}-${ApplicationName}-code-build-project
       Description: A description about my project
       LogsConfig:
         CloudWatchLogs: 
@@ -274,12 +274,12 @@ Resources:
         Image: 'aws/codebuild/amazonlinux2-x86_64-standard:3.0'
         EnvironmentVariables:
           - Name: httpEmail
-            Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${EnvLC}/send_email"
+            Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/send_email"
             Type: PLAINTEXT
       Source:
         Type: CODEPIPELINE
       Tags: 
-        - Key: env
+        - Key: Env
           Value: !Ref Env
   
   Secret:
@@ -288,20 +288,20 @@ Resources:
       Description: 'Token for accessing github repo'
       Name:
         !Sub
-          - 'github_token_${client}_${environment}_${application_name}'
-          - { client: !Ref Cust , environment: !Ref Env, application_name: !Ref ApplicationName }
+          - 'github_token_${client}_${Environment}_${application_name}'
+          - { client: !Ref CustLC , Environment: !Ref EnvLC, application_name: !Ref ApplicationName }
       SecretString: 
         !Sub
-          - '{"github_access_token_${client}_${environment}_${application_name}": "${token}"}'
-          - { client: !Ref Cust, environment: !Ref Env, application_name: !Ref ApplicationName, token: !Ref Token } 
+          - '{"github_access_token_${client}_${Environment}_${application_name}": "${token}"}'
+          - { client: !Ref CustLC, Environment: !Ref EnvLC, application_name: !Ref ApplicationName, token: !Ref Token } 
       Tags: 
-        - Key: env
+        - Key: Env
           Value: !Ref Env
   
   CodePipelineRole:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName:  !Sub ${Cust}-${Env}-${ApplicationName}-code-pipeline-role
+      RoleName:  !Sub ${CustLC}-${EnvLC}-${ApplicationName}-code-pipeline-role
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -315,14 +315,14 @@ Resources:
         - 'arn:aws:iam::aws:policy/AdministratorAccess'
       Path: /
       Tags: 
-        - Key: env
+        - Key: Env
           Value: !Ref Env
   
   CodePipeline:
     Type: 'AWS::CodePipeline::Pipeline'
     DependsOn: Secret
     Properties:
-      # Name: !Sub ${Client}-${Env}-${ApplicationName}-code-pipeline
+      # Name: !Sub ${Client}-${EnvLC}-${ApplicationName}-code-pipeline
       ArtifactStore:
         Location: !Ref ArtifactBucket
         Type: S3
@@ -346,8 +346,8 @@ Resources:
                 Branch: !Ref Branch
                 OAuthToken: 
                     !Sub
-                      - '{{resolve:secretsmanager:github_token_${client}_${environment}_${application_name}:SecretString:github_access_token_${client}_${environment}_${application_name}}}'
-                      - { client: !Ref Cust, environment: !Ref Env, application_name: !Ref ApplicationName }
+                      - '{{resolve:secretsmanager:github_token_${client}_${Environment}_${application_name}:SecretString:github_access_token_${client}_${Environment}_${application_name}}}'
+                      - { client: !Ref CustLC, Environment: !Ref EnvLC, application_name: !Ref ApplicationName }
                 PollForSourceChanges: false
               RunOrder: 1
           Name: SOURCE
@@ -381,5 +381,5 @@ Resources:
                 Extract: true
               RunOrder: 1
       Tags: 
-        - Key: env
+        - Key: Env
           Value: !Ref Env

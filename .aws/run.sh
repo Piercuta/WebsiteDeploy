@@ -42,7 +42,7 @@ AWS_DEBUG="--region ${REGION} ${PROFILE}"
 TEMPLATE="template.yml"
 PACKAGED_TEMPLATE="packaged-${TEMPLATE}"
 BUCKET_CODE="${CUST,,}-${ENV,,}-deploy-website-code"
-STACK_NAME="${CUST}-${ENV}-DEPLOY-WEBSITE"
+STACK_NAME="${CUST,,}-${ENV,,}-website-deploy"
 
 LOG() {
     if [ $VERBOSE = true ]; then
